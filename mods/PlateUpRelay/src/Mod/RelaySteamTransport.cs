@@ -8,6 +8,7 @@ using LiteNetLib;
 using LiteNetLib.Utils;
 using Steamworks;
 using UnityEngine;
+using Stopwatch = System.Diagnostics.Stopwatch;
 using SteamNet = Steamworks.SteamNetworking;
 
 namespace PlateUpRelay
@@ -30,6 +31,18 @@ namespace PlateUpRelay
         private float nextKeyRequest;
         private float nextConnect;
         private float failureUntil;
+        /// <summary>网络库已测得的服务器往返延迟；尚未收到样本时为空。</summary>
+        private int? serverPing;
+        /// <summary>房间测量每两秒发起一次，五秒无应答作废，十秒未更新不再显示旧值。</summary>
+        private const float ProbeInterval = 2f;
+        private const float ProbeTimeout = 5f;
+        private const float SampleLifetime = 10f;
+        private uint probeSequence;
+        private uint pendingProbe;
+        private long probeStarted;
+        private float nextProbeAt;
+        private int? roomPing;
+        private float roomPingAt;
 
         public RelaySteamTransport(JoinCode code) : base(code) { }
 
@@ -41,6 +54,57 @@ namespace PlateUpRelay
                     if (transport.CurrentLobby.Id.IsValid && transport.CurrentLobby.MemberCount > 1)
                         return true;
                 return false;
+            }
+        }
+
+        /// <summary>Steam 房间状态与到房主的往返样本，不用服务器往返代替房间延迟。</summary>
+        public static RelayText RoomStatus
+        {
+            get
+            {
+                foreach (var transport in instances)
+                {
+                    switch (transport.LobbyStatus)
+                    {
+                        case LobbyTransportStatus.Connecting:
+                            return RelayText.RoomJoining;
+                        case LobbyTransportStatus.Disconnecting:
+                            return RelayText.RoomLeaving;
+                        case LobbyTransportStatus.Ready:
+                            if (transport.IsHosting)
+                                return RelayText.RoomHosting;
+                            if (!RelaySettings.Enabled)
+                                return RelayText.RoomOriginal;
+                            if (!transport.ready.Contains(transport.ownerId))
+                                return RelayText.RoomWaitingHost;
+                            int? ping = Time.realtimeSinceStartup - transport.roomPingAt < SampleLifetime
+                                ? transport.roomPing : null;
+                            return RelayText.RoomJoined(ping);
+                    }
+                }
+                return RelayText.RoomNone;
+            }
+        }
+
+        /// <summary>向常驻 HUD 提供两段往返延迟；未连通或样本过期时为空。</summary>
+        /// <param name="server">本机到中转服务器的往返毫秒值。</param>
+        /// <param name="room">经中转到房主的往返毫秒值；本机房主为零。</param>
+        public static void GetLatency(out int? server, out int? room)
+        {
+            server = null;
+            room = null;
+            foreach (var transport in instances)
+            {
+                if (RelaySettings.Enabled && transport.relay != null &&
+                    transport.relay.ConnectionState == LiteNetLib.ConnectionState.Connected)
+                    server = transport.serverPing;
+                if (transport.LobbyStatus != LobbyTransportStatus.Ready)
+                    continue;
+                if (transport.IsHosting)
+                    room = 0;
+                else if (RelaySettings.Enabled && transport.ready.Contains(transport.ownerId) &&
+                    Time.realtimeSinceStartup - transport.roomPingAt < SampleLifetime)
+                    room = transport.roomPing;
             }
         }
 
@@ -128,9 +192,8 @@ namespace PlateUpRelay
                     EnsureConnection();
                     network?.PollEvents(256);
                     if (relay != null && relay.ConnectionState == LiteNetLib.ConnectionState.Connected)
-                        RelaySettings.Status = !IsHosting && !ready.Contains(ownerId)
-                            ? RelayText.WaitingHost
-                            : RelayText.Connected(relay.Ping);
+                        RelaySettings.Status = serverPing.HasValue ? RelayText.Connected(serverPing.Value) : RelayText.ServerMeasuring;
+                    PollRoomPing();
                 }
                 LobbyMembers.RemoveAll(member => !ready.Contains((ulong)member.ID));
             }
@@ -142,6 +205,34 @@ namespace PlateUpRelay
                 RelaySettings.Status = RelayText.Failure(ex.Message);
                 Debug.LogError("[PlateUpRelay] " + ex);
             }
+        }
+
+        /// <summary>沿实际中转路径测量到房主的往返；只保留一个未完成请求，超时后丢弃旧样本。</summary>
+        private void PollRoomPing()
+        {
+            if (IsHosting || relay == null || relay.ConnectionState != LiteNetLib.ConnectionState.Connected || !ready.Contains(ownerId))
+            {
+                pendingProbe = 0;
+                roomPing = null;
+                return;
+            }
+            if (pendingProbe != 0)
+            {
+                if ((Stopwatch.GetTimestamp() - probeStarted) / (double)Stopwatch.Frequency < ProbeTimeout)
+                    return;
+                pendingProbe = 0;
+                roomPing = null;
+            }
+            if (Time.realtimeSinceStartup < nextProbeAt)
+                return;
+            nextProbeAt = Time.realtimeSinceStartup + ProbeInterval;
+            if (++probeSequence == 0)
+                ++probeSequence;
+            var payload = new NetDataWriter();
+            payload.Put(probeSequence);
+            probeStarted = Stopwatch.GetTimestamp();
+            if (Protocol.Send(relay, Protocol.Message(ownerId, payload.CopyData(), Protocol.Ping)))
+                pendingProbe = probeSequence;
         }
 
         protected override TransportSendResult SendToClient(SteamNetworkTarget client, byte[] data)
@@ -228,9 +319,18 @@ namespace PlateUpRelay
                 {
                     relay = null;
                     ready.Clear();
+                    serverPing = null;
+                    roomPing = null;
+                    pendingProbe = 0;
                     nextConnect = Time.realtimeSinceStartup + 2;
                     RelaySettings.Status = RelayText.Disconnected(info.Reason.ToString());
                     Debug.LogWarning("[PlateUpRelay] Relay disconnected: " + info.Reason);
+                };
+                events.NetworkLatencyUpdateEvent += (peer, _) =>
+                {
+                    // LiteNetLib 的 Ping 和 latency 回调值是半程估算；面板统一显示实际往返。
+                    if (peer == relay)
+                        serverPing = peer.RoundTripTime;
                 };
                 events.NetworkReceiveEvent += Receive;
                 events.NetworkErrorEvent += (endpoint, error) => RelaySettings.Status = RelayText.NetworkError(error.ToString());
@@ -272,6 +372,42 @@ namespace PlateUpRelay
             if (kind == Protocol.Left && reader.AvailableBytes == 0)
             {
                 ready.Remove(source);
+                if (source == ownerId)
+                {
+                    roomPing = null;
+                    pendingProbe = 0;
+                }
+                return;
+            }
+            if (kind == Protocol.Ping || kind == Protocol.Pong)
+            {
+                if (reader.AvailableBytes != 4)
+                {
+                    peer.Disconnect();
+                    return;
+                }
+                if (!ready.Contains(source) || !IsMember(source))
+                    return;
+                uint sequence = reader.GetUInt();
+                if (kind == Protocol.Ping && IsHosting)
+                {
+                    var payload = new NetDataWriter();
+                    payload.Put(sequence);
+                    Protocol.Send(peer, Protocol.Message(source, payload.CopyData(), Protocol.Pong));
+                }
+                else if (kind == Protocol.Pong && !IsHosting && source == ownerId)
+                {
+                    // 超时或上一轮的应答不能更新当前样本。
+                    double elapsed = (Stopwatch.GetTimestamp() - probeStarted) / (double)Stopwatch.Frequency;
+                    if (pendingProbe != 0 && sequence == pendingProbe && elapsed < ProbeTimeout)
+                    {
+                        roomPing = (int)Math.Round(elapsed * 1000);
+                        roomPingAt = Time.realtimeSinceStartup;
+                        pendingProbe = 0;
+                    }
+                }
+                else
+                    peer.Disconnect();
                 return;
             }
             if (kind != Protocol.Data || reader.AvailableBytes == 0)
@@ -290,6 +426,12 @@ namespace PlateUpRelay
             network = null;
             relay = null;
             ready.Clear();
+            serverPing = null;
+            roomPing = null;
+            pendingProbe = 0;
+            probeStarted = 0;
+            nextProbeAt = 0;
+            RelaySettings.Status = RelaySettings.Enabled ? RelayText.WaitingLobby : RelayText.Disabled;
             if (secret != null)
                 Array.Clear(secret, 0, secret.Length);
             secret = null;

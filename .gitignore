@@ -1,14 +1,14 @@
 # .NET 构建输出与本地依赖包
 **/bin/
 **/obj/
-/src/packages/
+/packages/*
+!/packages/README.md
 *.nupkg
 
 # 服务端运行时与模组分发产物
-/server/
-/PlateUpRelay.zip
-/workshop/content/*.dll
-/workshop/content/*.pdb
+/mods/*/dist/
+/mods/*/workshop/content/*.dll
+/mods/*/workshop/content/*.pdb
 
 # 本地开发环境与缓存
 .vs/

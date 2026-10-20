@@ -5,7 +5,7 @@ from PIL import Image, ImageDraw, ImageFont
 # 用矢量图形和本机字体绘制工坊封面，缩小时保留清楚的标题与图标。
 SIZE = 1024
 SCALE = 3
-OUT = Path(__file__).resolve().parents[1] / "工坊封面.png"
+OUT = Path(__file__).resolve().with_name("工坊封面.png")
 FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Bold.ttc"
 image = Image.new("RGB", (SIZE * SCALE, SIZE * SCALE))
 draw = ImageDraw.Draw(image)
@@ -117,9 +117,9 @@ for y in (568, 631, 694):
 text("你的服务器", (510, 775), 30, mint, "mm")
 
 # 功能提示保留在底部，缩略图仍以主标题为主。
-rect((61, 890, 145, 951), mint, 14)
-text("F8", (103, 919), 33, navy, "mm")
-text("打开中转设置", (168, 899), 35)
+rect((61, 890, 181, 951), mint, 14)
+text("设置", (121, 919), 30, navy, "mm")
+text("→ 游戏中转", (204, 899), 35)
 text("SERVER RELAY", (961, 922), 22, muted, "rm")
 
 image = image.resize((SIZE, SIZE), Image.Resampling.LANCZOS)

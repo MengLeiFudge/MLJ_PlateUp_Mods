@@ -3,7 +3,7 @@
     <TargetFramework>netstandard2.0</TargetFramework>
     <LangVersion>latest</LangVersion>
     <AssemblyName>PlateUpRelay</AssemblyName>
-    <Version>0.1.2</Version>
+    <Version>0.1.5</Version>
     <GameDir Condition="'$(GameDir)' == ''">D:\Steam\steamapps\common\PlateUp\PlateUp\PlateUp_Data\Managed</GameDir>
     <HarmonyPath Condition="'$(HarmonyPath)' == ''">D:\Steam\steamapps\workshop\content\1599600\2898033283\0Harmony.dll</HarmonyPath>
   </PropertyGroup>
@@ -23,8 +23,7 @@
     <Reference Include="Facepunch.Steamworks.Win64"><HintPath>$(GameDir)\Facepunch.Steamworks.Win64.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine"><HintPath>$(GameDir)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameDir)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(GameDir)\UnityEngine.IMGUIModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameDir)\UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
-    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(GameDir)\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.TextMeshPro"><HintPath>$(GameDir)\Unity.TextMeshPro.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.UI"><HintPath>$(GameDir)\UnityEngine.UI.dll</HintPath><Private>false</Private></Reference>
   </ItemGroup>
 </Project>

@@ -41,7 +41,13 @@ internal sealed class RelayServer : IDisposable
     private void Accept(ConnectionRequest request)
     {
         var data = request.Data;
-        if (data.AvailableBytes != 4 + 8 * 3 + Protocol.SecretLength || data.GetUInt() != Protocol.Magic)
+        if (data.AvailableBytes != 4 + 8 * 3 + Protocol.SecretLength)
+        {
+            request.Reject();
+            return;
+        }
+        uint magic = data.GetUInt();
+        if (magic != Protocol.Magic && magic != Protocol.LegacyMagic)
         {
             request.Reject();
             return;
@@ -120,15 +126,28 @@ internal sealed class RelayServer : IDisposable
         Console.WriteLine($"Player disconnected; rooms={rooms.Count}");
     }
 
+    /// <summary>游戏与延迟测量共用房间隔离；测量只允许客户端请求、房主应答。</summary>
+    /// <param name="peer">已绑定身份的连接。</param>
+    /// <param name="reader">本次消息，回调后由网络库回收。</param>
+    /// <param name="channel">仅接受游戏使用的通道。</param>
+    /// <param name="delivery">仅接受可靠有序传输。</param>
     private static void Receive(NetPeer peer, NetPacketReader reader, byte channel, DeliveryMethod delivery)
     {
         if (peer.Tag is not Session sender || channel != 0 || delivery != DeliveryMethod.ReliableOrdered ||
-            reader.AvailableBytes < 10 || reader.AvailableBytes > Protocol.MaxPayload + 9 || reader.GetByte() != Protocol.Data)
+            reader.AvailableBytes < 10 || reader.AvailableBytes > Protocol.MaxPayload + 9)
         {
             peer.Disconnect();
             return;
         }
+        byte kind = reader.GetByte();
         ulong destination = reader.GetULong();
+        bool validPing = kind == Protocol.Ping && sender.Player != sender.Room.Owner && reader.AvailableBytes == 4;
+        bool validPong = kind == Protocol.Pong && sender.Player == sender.Room.Owner && reader.AvailableBytes == 4;
+        if (kind != Protocol.Data && !validPing && !validPong)
+        {
+            peer.Disconnect();
+            return;
+        }
         if (destination == sender.Player || (sender.Player != sender.Room.Owner && destination != sender.Room.Owner))
         {
             peer.Disconnect();
@@ -140,7 +159,7 @@ internal sealed class RelayServer : IDisposable
             Notify(peer, Protocol.Left, destination);
             return;
         }
-        if (!Protocol.Send(target.Peer, Protocol.Message(sender.Player, reader.GetRemainingBytes())))
+        if (!Protocol.Send(target.Peer, Protocol.Message(sender.Player, reader.GetRemainingBytes(), kind)))
             Notify(peer, Protocol.Left, destination);
     }
 
@@ -148,7 +167,7 @@ internal sealed class RelayServer : IDisposable
     {
         if (!network.Start(IPAddress.Any, IPAddress.IPv6Any, port))
             throw new InvalidOperationException($"Cannot bind UDP {port}");
-        Console.WriteLine($"PlateUp relay listening on UDP {port}; protocol v1");
+        Console.WriteLine($"PlateUp relay listening on UDP {port}; protocol v2 (v1 clients accepted)");
         Console.CancelKeyPress += Cancel;
         using var signal = PosixSignalRegistration.Create(PosixSignal.SIGTERM, context =>
         {
