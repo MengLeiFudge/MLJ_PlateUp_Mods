@@ -1,0 +1,64 @@
+This mod routes PlateUp multiplayer game data through a server you host: a server administrator must run the companion relay service, and players install this mod and Harmony, press F8 in-game to enter the server address, then invite friends or join a lobby through Steam as usual.
+
+
+[Server administrators: Deploy the relay service]
+
+1. Prepare a server
+Use a server that your players can reach. The provided deployment setup targets Linux x64. The server only forwards data; it does not need PlateUp or Steam installed.
+
+2. Download and build the companion service
+Public source repository:
+https://github.com/MengLeiFudge/MLJ_PlateUp_Mods
+
+Download the complete source as a ZIP:
+https://github.com/MengLeiFudge/MLJ_PlateUp_Mods/archive/refs/heads/main.zip
+
+Download and extract the complete repository, install the .NET SDK required by the project on your build machine, and follow the “源码与构建” (Source and build) section in 使用说明.md to publish the server application. The server project is in src/Server and references src/Shared, so keep the full directory structure intact.
+
+3. Deploy the application and open the port
+Copy the published files to your server and start PlateUpRelay.Server. The repository includes plateup-relay.service for managing the service with systemd.
+Allow inbound traffic to the application's UDP listening port in both your cloud security group and the server's firewall. The default is UDP 27841. If you change the port, update the application's listening port and the firewall rules to match. If you use port forwarding, make sure it forwards UDP traffic.
+The server must run the companion relay application. Opening a port or running an unrelated application does not provide the relay functionality this mod requires.
+
+4. Share the connection details with players
+Give the host and the other players the public IPv4 address and port they can use to reach the server. Keep the relay service running throughout the game session.
+Everyone in the same game uses this relay service; each player does not need a separate server. The relay does not run the game on behalf of the host, so the host must remain online.
+
+
+[Players: Install the mod and connect]
+
+1. Install the mod and its prerequisite
+The host and every other player must subscribe to this mod and Harmony (Workshop ID: 2898033283), use the same version of this mod, and restart the game.
+
+Tip: Workshop loading restriction and manual installation (Windows)
+Following a malicious Workshop mod incident, the developers temporarily stopped the game from loading newly uploaded mods. Game builds with this restriction skip Workshop items with IDs above 3820868888. This mod's Workshop ID is 3823021451, so affected builds will not load it through the Workshop even after you subscribe and download it. To install it in the local Mods folder:
+
+① Exit the game and wait for Steam to finish downloading this mod's subscribed files.
+② Open steamapps\workshop\content\1599600\3823021451 in the relevant Steam library and copy PlateUpRelay.dll, LiteNetLib.dll, and LiteNetLib-LICENSE.txt.
+③ In the Steam library containing the game, create steamapps\common\PlateUp\PlateUp\Mods\PlateUpRelay and place those files directly inside it. To find the game folder, right-click PlateUp in Steam → Properties → Installed Files → Browse, then open the inner PlateUp folder and find or create Mods.
+④ Keep your Harmony subscription, restart the game, and continue with step 2 below. The host and every other player need to complete these steps and use the same mod version.
+
+The local copy does not update automatically with your Workshop subscription. Exit the game and replace the files manually when updating. Once Workshop loading is restored, remove the local copy before using the subscribed version to avoid loading the mod twice.
+Official announcement: “Workshop Incident - October 2026”, available at https://steamcommunity.com/app/1599600/allnews/
+
+
+2. Enter the relay address
+Get the IP address and port from the server administrator. Press F8 at the main menu or while in a lobby with no other players.
+For the default port, UDP 27841, enter just the IPv4 address. For a different port, enter IP:port. Domain names and IPv6 addresses are not supported.
+Click “Save and enable”. The host and all other players must enter the IP address and port of the same relay service. Players do not need to download the source code or deploy the server application.
+
+3. Invite friends or join a lobby as usual
+Use Steam's normal friend invitation and lobby joining features. After you join, the mod automatically confirms your identity and connects to the relay.
+The F8 window shows the connection stage. If it is waiting for identity confirmation, make sure the host has also installed and enabled the mod. Game data can start flowing through the relay once the server is connected and the host is ready on the relay.
+The host still runs the game logic and must remain online throughout the session. Steam's lobby and relay setup communication must remain available.
+
+4. Change settings or disable the relay
+Leave the multiplayer lobby before changing the address or clicking “Disable relay and use the original connection”. Closing the F8 window does not disable the relay.
+
+
+[Compatibility and connection quality]
+
+• Supports Steam multiplayer only. Photon cross-platform multiplayer is not currently supported.
+• Only forwards game session data and does not affect other network traffic on your computer.
+• Results depend on the quality, packet loss, and bandwidth of the connections between the players, the host, and the server. Lower latency is not guaranteed, and the relay cannot fix frame-rate drops caused by computer performance.
+• The server round-trip time shown in the panel measures how long data takes to travel between a player and the server and back. Actual in-game latency also depends on the other players' round-trip times to the server.

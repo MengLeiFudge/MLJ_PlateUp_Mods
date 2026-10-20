@@ -18,13 +18,14 @@
 | Steam 凭据交换 | `RelaySteamTransport.cs` → `PollBootstrap`、`RequestKey` | 房间成员及房主身份检查 |
 | UDP 连接与收包 | `RelaySteamTransport.cs` → `EnsureConnection`、`Receive` | 连接凭据、断线重连、消息筛选 |
 | 离房与配置变更清理 | `RelaySteamTransport.cs` → `StopRelay` | 停止网络并清空凭据、成员和重试时刻 |
+| 修改面板语言与连接状态文案 | `RelayText.cs` | `RelayText.Value` 按 `Localisation.CurrentLocale` 选择中文或英文 |
 
 ## 约定
 
 - 即使关闭中转，工厂仍返回 `RelaySteamTransport`；禁用分支将发送交回 `SteamLobbyTransport`。
 - `PostActivate` 仅加载设置和补丁；游戏世界中的 `RelayPanelSystem` 拥有面板，输入接口可用后才轮询 F8。
 - 面板关闭与中转关闭是不同操作；窗口打开时保存光标状态，关闭或销毁时恢复，销毁时释放动态字体。
-- `OnGUI` 恢复共享 `GUI.skin.font`；保留 `ExitGUIException` 的重新抛出路径。
+- 面板持有私有 `GUISkin`，文字和控件按参考分辨率等比缩放；`OnGUI` 恢复原 `GUI.skin` 与 `GUI.matrix`，保留 `ExitGUIException` 的重新抛出路径。
 - `RelaySettings.TryParse` 仅接受 IPv4 和可选端口；空地址表示禁用。`Save` 持久化后增加 `Revision`。
 - `Update` 先调用基类；房间、房主或配置修订变化后重建中转状态，房主用随机数生成临时凭据。
 - `PollBootstrap` 检查消息长度、Magic、Lobby ID 和成员身份；凭据回复仅接受当前房主且本机尚无凭据的情况。
@@ -33,6 +34,7 @@
 - `Dispose`、`RequestDisconnect`、`RequestSuspend` 均先清理中转再调用基类；`StopRelay` 清零凭据数组后释放引用。
 - 传输异常会清理状态并暂缓重试；ECS 初始化或输入异常会停用该系统，防止每帧重复报错。
 - Unity 日志统一使用 `[PlateUpRelay]` 前缀；连接阶段分别记录 Steam 房间就绪、凭据收到、UDP 连通和房主就绪。
+- `RelayText` 保存中英文消息，显示时读取游戏语言；系统异常详情保留原文。不要把普通连接状态预先转换成某种语言的字符串缓存。
 
 ## 禁止事项
 

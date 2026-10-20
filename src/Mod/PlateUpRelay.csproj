@@ -14,6 +14,7 @@
     <Reference Include="0Harmony"><HintPath>$(HarmonyPath)</HintPath><Private>false</Private></Reference>
     <Reference Include="KitchenMods"><HintPath>$(GameDir)\KitchenMods.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Kitchen.Common"><HintPath>$(GameDir)\Kitchen.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Kitchen.GameData"><HintPath>$(GameDir)\Kitchen.GameData.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.Entities"><HintPath>$(GameDir)\Unity.Entities.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.Collections"><HintPath>$(GameDir)\Unity.Collections.dll</HintPath><Private>false</Private></Reference>
     <Reference Include="Unity.Collections.LowLevel.ILSupport"><HintPath>$(GameDir)\Unity.Collections.LowLevel.ILSupport.dll</HintPath><Private>false</Private></Reference>

@@ -59,7 +59,7 @@ namespace PlateUpRelay
         public static IPEndPoint Endpoint { get; private set; }
         public static int Revision { get; private set; }
         public static bool Enabled => Endpoint != null;
-        public static string Status = "未启用中转";
+        public static RelayText Status = RelayText.Disabled;
 
         public static void Load()
         {
@@ -89,7 +89,7 @@ namespace PlateUpRelay
         public static void Save(string text)
         {
             if (!TryParse(text, out var endpoint))
-                throw new ArgumentException("请输入有效的 IPv4 地址，可附加 :端口。");
+                throw new ArgumentException(RelayText.InvalidAddress.Value);
             string normalized = text.Trim();
             PlayerPrefs.SetString(PreferenceKey, normalized);
             PlayerPrefs.Save();
@@ -102,11 +102,16 @@ namespace PlateUpRelay
     /// <summary>F8 打开游戏内地址设置；只在没有远端玩家时切换，避免打断进行中的对局。</summary>
     public sealed class RelayPanel : MonoBehaviour
     {
+        /// <summary>面板布局使用的参考分辨率；绘制时按游戏渲染尺寸等比缩放。</summary>
+        private const float ReferenceWidth = 1920f;
+        private const float ReferenceHeight = 1080f;
         private bool visible;
         private string input = "";
-        private string error = "";
-        private Rect window = new Rect(40, 80, 540, 290);
+        private RelayText error;
+        private Rect window = new Rect(40, 80, 760, 560);
         private Font font;
+        /// <summary>面板私有皮肤；放大控件时不改动游戏共享样式，随面板销毁。</summary>
+        private GUISkin skin;
         private bool loggedDrawing;
         private bool oldCursorVisible;
         private CursorLockMode oldCursorLock;
@@ -121,7 +126,7 @@ namespace PlateUpRelay
                 else
                 {
                     input = RelaySettings.Address;
-                    error = "";
+                    error = default;
                     oldCursorVisible = Cursor.visible;
                     oldCursorLock = Cursor.lockState;
                     visible = true;
@@ -150,13 +155,38 @@ namespace PlateUpRelay
         {
             if (!visible)
                 return;
-            Font original = GUI.skin.font;
+            GUISkin original = GUI.skin;
+            Matrix4x4 originalMatrix = GUI.matrix;
             try
             {
                 if (font == null)
-                    font = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei", "SimHei", "Arial" }, 16);
-                GUI.skin.font = font;
-                window = GUI.Window(2784101, window, Draw, "PlateUp 游戏中转 · F8");
+                    font = Font.CreateDynamicFontFromOSFont(new[] { "Microsoft YaHei", "SimHei", "Arial" }, 22);
+                if (skin == null)
+                {
+                    skin = UnityEngine.Object.Instantiate(original);
+                    skin.font = font;
+                    skin.label.font = font;
+                    skin.label.fontSize = 22;
+                    skin.label.wordWrap = true;
+                    skin.label.fixedHeight = 0;
+                    skin.textField.font = font;
+                    skin.textField.fontSize = 22;
+                    skin.textField.fixedHeight = 44;
+                    skin.textField.padding = new RectOffset(12, 12, 8, 8);
+                    skin.button.font = font;
+                    skin.button.fontSize = 22;
+                    skin.button.fixedHeight = 44;
+                    skin.window.font = font;
+                    skin.window.fontSize = 24;
+                    skin.window.padding = new RectOffset(24, 24, 48, 24);
+                }
+                // 使用同一矩阵缩放绘制与 IMGUI 输入坐标；分辨率变化后将窗口留在屏幕内。
+                float scale = Mathf.Min(Screen.width / ReferenceWidth, Screen.height / ReferenceHeight);
+                window.x = Mathf.Clamp(window.x, 0, Screen.width / scale - window.width);
+                window.y = Mathf.Clamp(window.y, 0, Screen.height / scale - window.height);
+                GUI.matrix = originalMatrix * Matrix4x4.Scale(new Vector3(scale, scale, 1));
+                GUI.skin = skin;
+                window = GUI.Window(2784101, window, Draw, RelayText.Title.Value);
                 if (!loggedDrawing && Event.current.type == EventType.Repaint)
                 {
                     loggedDrawing = true;
@@ -172,33 +202,39 @@ namespace PlateUpRelay
                 Close();
                 Debug.LogError("[PlateUpRelay] Settings rendering failed: " + ex);
             }
-            finally { GUI.skin.font = original; }
+            finally
+            {
+                GUI.skin = original;
+                GUI.matrix = originalMatrix;
+            }
         }
 
         private void Draw(int id)
         {
-            GUILayout.Label("服务器 IPv4（默认 UDP 27841，可填 IP:端口）");
+            GUILayout.Label(RelayText.ServerRequired.Value);
+            GUILayout.Label(RelayText.PortNotEnough.Value);
+            GUILayout.Label(RelayText.AddressLabel.Value);
             input = GUILayout.TextField(input, 64);
-            GUILayout.Label("状态：" + RelaySettings.Status);
+            GUILayout.Label(RelayText.StatusLabel.Value + RelaySettings.Status.Value);
             bool busy = RelaySteamTransport.HasRemotePlayers;
-            GUILayout.Label(busy ? "请先离开当前多人房间，再修改地址。" : "保存后正常邀请朋友；所有玩家填写同一个服务器。");
+            GUILayout.Label((busy ? RelayText.LeaveLobbyToChange : RelayText.InviteHint).Value);
             bool original = GUI.enabled;
             GUI.enabled = !busy;
-            if (GUILayout.Button("保存并启用"))
+            if (GUILayout.Button(RelayText.SaveAndEnable.Value))
             {
                 if (string.IsNullOrWhiteSpace(input))
-                    error = "请输入服务器 IP。";
+                    error = RelayText.EnterAddress;
                 else
                     Apply(input);
             }
-            if (GUILayout.Button("关闭中转，使用原联机"))
+            if (GUILayout.Button(RelayText.DisableRelay.Value))
                 Apply("");
             GUI.enabled = original;
-            if (!string.IsNullOrEmpty(error))
-                GUILayout.Label(error);
-            if (GUILayout.Button("关闭窗口"))
+            if (!string.IsNullOrEmpty(error.Value))
+                GUILayout.Label(error.Value);
+            if (GUILayout.Button(RelayText.CloseWindow.Value))
                 Close();
-            GUI.DragWindow(new Rect(0, 0, 540, 24));
+            GUI.DragWindow(new Rect(0, 0, window.width, 40));
         }
 
         private void Apply(string value)
@@ -206,16 +242,16 @@ namespace PlateUpRelay
             try
             {
                 if (RelaySteamTransport.HasRemotePlayers)
-                    throw new InvalidOperationException("请先离开多人房间。");
+                    throw new InvalidOperationException(RelayText.LeaveLobby.Value);
                 if (value != "" && string.IsNullOrWhiteSpace(value))
-                    throw new ArgumentException("请输入服务器 IP。");
+                    throw new ArgumentException(RelayText.EnterAddress.Value);
                 RelaySettings.Save(value);
                 input = RelaySettings.Address;
-                error = "已保存";
+                error = RelayText.Saved;
             }
             catch (Exception ex)
             {
-                error = ex.Message;
+                error = new RelayText(ex.Message, ex.Message);
                 Debug.LogWarning("[PlateUpRelay] Settings: " + ex.Message);
             }
         }
@@ -224,6 +260,8 @@ namespace PlateUpRelay
         {
             if (visible)
                 Close();
+            if (skin != null)
+                UnityEngine.Object.Destroy(skin);
             if (font != null)
                 UnityEngine.Object.Destroy(font);
         }

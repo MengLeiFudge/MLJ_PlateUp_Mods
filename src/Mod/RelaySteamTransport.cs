@@ -87,13 +87,13 @@ namespace PlateUpRelay
             if (!RelaySettings.Enabled)
             {
                 StopRelay();
-                RelaySettings.Status = "未启用中转";
+                RelaySettings.Status = RelayText.Disabled;
                 return;
             }
             if (LobbyStatus != LobbyTransportStatus.Ready)
             {
                 StopRelay();
-                RelaySettings.Status = "等待 Steam 房间";
+                RelaySettings.Status = RelayText.WaitingLobby;
                 return;
             }
             if (Time.realtimeSinceStartup < failureUntil)
@@ -121,7 +121,7 @@ namespace PlateUpRelay
                 if (secret == null)
                 {
                     RequestKey();
-                    RelaySettings.Status = "等待房主模组确认身份（房主也需开启中转）";
+                    RelaySettings.Status = RelayText.WaitingCredentials;
                 }
                 else
                 {
@@ -129,8 +129,8 @@ namespace PlateUpRelay
                     network?.PollEvents(256);
                     if (relay != null && relay.ConnectionState == LiteNetLib.ConnectionState.Connected)
                         RelaySettings.Status = !IsHosting && !ready.Contains(ownerId)
-                            ? "服务器已连接，等待房主连接同一服务器"
-                            : "服务器已连接 · 往返 " + relay.Ping + " ms";
+                            ? RelayText.WaitingHost
+                            : RelayText.Connected(relay.Ping);
                 }
                 LobbyMembers.RemoveAll(member => !ready.Contains((ulong)member.ID));
             }
@@ -139,7 +139,7 @@ namespace PlateUpRelay
                 StopRelay();
                 LobbyMembers.Clear();
                 failureUntil = Time.realtimeSinceStartup + 3;
-                RelaySettings.Status = "中转异常：" + ex.Message;
+                RelaySettings.Status = RelayText.Failure(ex.Message);
                 Debug.LogError("[PlateUpRelay] " + ex);
             }
         }
@@ -229,15 +229,15 @@ namespace PlateUpRelay
                     relay = null;
                     ready.Clear();
                     nextConnect = Time.realtimeSinceStartup + 2;
-                    RelaySettings.Status = "中转未连接：" + info.Reason + "，稍后重试";
+                    RelaySettings.Status = RelayText.Disconnected(info.Reason.ToString());
                     Debug.LogWarning("[PlateUpRelay] Relay disconnected: " + info.Reason);
                 };
                 events.NetworkReceiveEvent += Receive;
-                events.NetworkErrorEvent += (endpoint, error) => RelaySettings.Status = "UDP 网络错误：" + error;
+                events.NetworkErrorEvent += (endpoint, error) => RelaySettings.Status = RelayText.NetworkError(error.ToString());
                 events.ConnectionRequestEvent += request => request.Reject();
                 network = Protocol.CreateManager(events);
                 if (!network.Start())
-                    throw new InvalidOperationException("无法打开本机 UDP socket");
+                    throw new InvalidOperationException(RelayText.SocketUnavailable.Value);
             }
             if (relay == null && Time.realtimeSinceStartup >= nextConnect)
             {
@@ -249,7 +249,7 @@ namespace PlateUpRelay
                 connect.Put(secret);
                 relay = network.Connect(RelaySettings.Endpoint, connect);
                 nextConnect = Time.realtimeSinceStartup + 5;
-                RelaySettings.Status = "正在连接 " + RelaySettings.Address;
+                RelaySettings.Status = RelayText.Connecting(RelaySettings.Address);
             }
         }
 
