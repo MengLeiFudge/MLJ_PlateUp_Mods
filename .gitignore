@@ -1,0 +1,24 @@
+# .NET 构建输出与本地依赖包
+**/bin/
+**/obj/
+/src/packages/
+*.nupkg
+
+# 服务端运行时与模组分发产物
+/server/
+/PlateUpRelay.zip
+/workshop/content/*.dll
+/workshop/content/*.pdb
+
+# 本地开发环境与缓存
+.vs/
+.idea/
+*.user
+*.suo
+__pycache__/
+*.py[cod]
+
+# 本机凭据
+.env
+.env.*
+!.env.example

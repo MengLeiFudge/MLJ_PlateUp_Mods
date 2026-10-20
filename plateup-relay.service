@@ -1,0 +1,25 @@
+[Unit]
+Description=PlateUp game packet relay
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/plateup-relay
+ExecStart=/opt/plateup-relay/PlateUpRelay.Server 27841
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=15
+NoNewPrivileges=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=512M
+TasksMax=128
+Environment=DOTNET_EnableDiagnostics=0
+
+[Install]
+WantedBy=multi-user.target

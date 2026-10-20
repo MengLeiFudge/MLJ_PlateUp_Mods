@@ -1,0 +1,29 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>PlateUpRelay</AssemblyName>
+    <Version>0.1.2</Version>
+    <GameDir Condition="'$(GameDir)' == ''">D:\Steam\steamapps\common\PlateUp\PlateUp\PlateUp_Data\Managed</GameDir>
+    <HarmonyPath Condition="'$(HarmonyPath)' == ''">D:\Steam\steamapps\workshop\content\1599600\2898033283\0Harmony.dll</HarmonyPath>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="LiteNetLib" Version="1.3.1" />
+    <Compile Include="..\Shared\Protocol.cs" Link="Protocol.cs" />
+    <Reference Include="System.ValueTuple"><HintPath>$(GameDir)\System.ValueTuple.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="0Harmony"><HintPath>$(HarmonyPath)</HintPath><Private>false</Private></Reference>
+    <Reference Include="KitchenMods"><HintPath>$(GameDir)\KitchenMods.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Kitchen.Common"><HintPath>$(GameDir)\Kitchen.Common.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Entities"><HintPath>$(GameDir)\Unity.Entities.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Collections"><HintPath>$(GameDir)\Unity.Collections.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Unity.Collections.LowLevel.ILSupport"><HintPath>$(GameDir)\Unity.Collections.LowLevel.ILSupport.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Kitchen.Networking"><HintPath>$(GameDir)\Kitchen.Networking.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SteamNetworking"><HintPath>$(GameDir)\SteamNetworking.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Facepunch.Steamworks.Win64"><HintPath>$(GameDir)\Facepunch.Steamworks.Win64.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine"><HintPath>$(GameDir)\UnityEngine.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.CoreModule"><HintPath>$(GameDir)\UnityEngine.CoreModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.IMGUIModule"><HintPath>$(GameDir)\UnityEngine.IMGUIModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.InputLegacyModule"><HintPath>$(GameDir)\UnityEngine.InputLegacyModule.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="UnityEngine.TextRenderingModule"><HintPath>$(GameDir)\UnityEngine.TextRenderingModule.dll</HintPath><Private>false</Private></Reference>
+  </ItemGroup>
+</Project>
